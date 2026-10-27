@@ -88,7 +88,7 @@ def get_all_tasks(owner_id: Optional[int] = None):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Некорректные данные: ID задачи должен быть положительным числом"
             )
-        query.filter(TaskDB.owner_id == owner_id)
+        query = query.filter(TaskDB.owner_id == owner_id)
     return query.all()
 
 
@@ -137,11 +137,14 @@ def update_task(task_id: int, data: TaskUpdate):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Не переданы данные для обновления"
         )
-    for field, value in update_data.items():
-        task.field = value
+
+    updated_rows = db.query(TaskDB).filter(TaskDB.task_id == task_id).update(update_data)
+
+    if not updated_rows:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+
     db.commit()
-    db.refresh()
-    return task
+    return db.query(TaskDB).filter(TaskDB.task_id == task_id).first()
 
 
 
