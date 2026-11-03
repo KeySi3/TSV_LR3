@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException, status
 import os
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-# Определение путей к директориям и локальному файлу базы данных
+# Настройка подключения к базе данных SQLite
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = f"sqlite:///{os.path.join(BASE_DIR, 'tasks.db')}"
 
@@ -16,6 +16,7 @@ class Base(DeclarativeBase):
     pass
 
 
+# Модель таблицы SQLAlchemy
 class TaskDB(Base):
     __tablename__ = "tasks"
 
@@ -36,7 +37,6 @@ class TaskCreate(BaseModel):
     :param owner_id: Идентификатор владельца задачи
     :param task_name: Наименование задачи
     """
-    model_config = ConfigDict(extra="forbid")
     owner_id: int = Field(gt=0)
     task_name: str = Field(min_length=1, max_length=120)
 
@@ -49,7 +49,6 @@ class TaskRead(BaseModel):
     :param owner_id: Идентификатор владельца задачи
     :param task_name: Наименование задачи
     """
-    model_config = ConfigDict(from_attributes=True)
     task_id: int = Field(gt=0)
     owner_id: int = Field(gt=0)
     task_name: str = Field(min_length=1, max_length=120)
@@ -57,12 +56,11 @@ class TaskRead(BaseModel):
 
 class TaskUpdate(BaseModel):
     """
-    Pydantic-модель для валидации возвращаемых данных о задаче.
+    Pydantic-модель для валидации возвращаемых обновленных данных о задаче.
 
     :param owner_id: Идентификатор владельца задачи
     :param task_name: Наименование задачи
     """
-    model_config = ConfigDict(extra="forbid")
     owner_id: int = Field(gt=0)
     task_name: str = Field(min_length=1, max_length=120)
 
@@ -112,7 +110,7 @@ def get_task_by_id(task_id: int):
 @app.post("/tasks", response_model=TaskRead)
 def post_task(data: TaskCreate):
     """
-    Создаёт новую задачу, присваивает уникальный идентификатор и сохраняет её в файл.
+    Создаёт новую задачу, присваивает уникальный идентификатор и сохраняет её в БД.
 
     :param data: Входные валидированные данные задачи (TaskCreate)
     :return: Созданная задача с назначенным task_id
@@ -122,6 +120,7 @@ def post_task(data: TaskCreate):
     db.commit()
     db.refresh(new_task)
     return new_task
+
 
 @app.patch("/tasks/{task_id}", response_model=TaskRead)
 def update_task(task_id: int, data: TaskUpdate):
@@ -147,11 +146,10 @@ def update_task(task_id: int, data: TaskUpdate):
     return db.query(TaskDB).filter(TaskDB.task_id == task_id).first()
 
 
-
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int):
     """
-    Удаляет задачу из локального хранилища по её идентификатору.
+    Удаляет задачу из БД по её идентификатору.
 
     :param task_id: Идентификатор задачи, которую требуется удалить
     :return: None при успешном удалении
